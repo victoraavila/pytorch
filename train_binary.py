@@ -55,7 +55,7 @@ train_dataset.transform = transforms.Compose([
 ])
 
 # Leaving only label_0s and label_1s in both train dataset and val dataset
-label_0, label_1 = 0, 8
+label_0, label_1 = 1, 7
 # train_dataset.targets = 60000 integers from 0 to 9 indicating the label
 # (train_dataset.targets==label_0) | (train_dataset.targets==label_1) = 60000 bools indicating whether the label is in (0, label_1) or not in (0, label_1)
 train_dataset_indexes_to_keep = (train_dataset.targets==label_0) | (train_dataset.targets==label_1)
@@ -90,8 +90,19 @@ del os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO']
 model = SimpleNet().to(device = device)
 optimizer = optim.SGD(params = model.parameters(), lr = 1e-4)
 
+# Counting the total number of parameters, weights and biases
+# Each node has 1 weight connected to each node of the following layer (784 * 128 = 100352 + 128 * 2 = 100608)
+# For example, each node of the hidden layer has 784 weights connected to it (z = ∑i=1 to n(w_i * x_i) + b)
+# Each node has 1 bias (128 + 2 = 130), which is calculated only for activating non-linearity (without non-linearity, all layers could be expressed as ONE single layer)
+total_params = sum(p.numel() for p in model.parameters())
+weights_params = sum(p.numel() for p in model.parameters() if p.requires_grad and len(p.shape) > 1)
+biases_params = sum(p.numel() for p in model.parameters() if p.requires_grad and len(p.shape) == 1)
+print(f"Total de parâmetros: {total_params}")
+print(f"Parâmetros de weights: {weights_params}") 
+print(f"Parâmetros de biases: {biases_params}")
+
 # Training loop
-number_of_epochs = 30
+number_of_epochs = 10
 for epoch in range(number_of_epochs):
     model.train() # Sets the model to training mode (the opposite is model.eval())
     epoch_loss, number_of_images_seen, number_of_correct_predictions = 0, 0, 0
