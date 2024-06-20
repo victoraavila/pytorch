@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from calculate_mean_and_std import calculate_mean_and_std
 import os
+from PIL import Image, ImageDraw, ImageFont
 
 def mnist_binary_loss(predictions: torch.Tensor, labels: torch.Tensor):
     # Getting the predictions of being class 'label_1' for all 64 images
@@ -55,7 +56,7 @@ train_dataset.transform = transforms.Compose([
 ])
 
 # Leaving only label_0s and label_1s in both train dataset and val dataset
-label_0, label_1 = 1, 7
+label_0, label_1 = 0, 8
 # train_dataset.targets = 60000 integers from 0 to 9 indicating the label
 # (train_dataset.targets==label_0) | (train_dataset.targets==label_1) = 60000 bools indicating whether the label is in (0, label_1) or not in (0, label_1)
 train_dataset_indexes_to_keep = (train_dataset.targets==label_0) | (train_dataset.targets==label_1)
@@ -94,6 +95,7 @@ optimizer = optim.SGD(params = model.parameters(), lr = 1e-4)
 # Each node has 1 weight connected to each node of the following layer (784 * 128 = 100352 + 128 * 2 = 100608)
 # For example, each node of the hidden layer has 784 weights connected to it (z = ∑i=1 to n(w_i * x_i) + b)
 # Each node has 1 bias (128 + 2 = 130), which is calculated only for activating non-linearity (without non-linearity, all layers could be expressed as ONE single layer)
+# ReLu also improves non-linearity
 total_params = sum(p.numel() for p in model.parameters())
 weights_params = sum(p.numel() for p in model.parameters() if p.requires_grad and len(p.shape) > 1)
 biases_params = sum(p.numel() for p in model.parameters() if p.requires_grad and len(p.shape) == 1)
@@ -151,3 +153,38 @@ for epoch in range(number_of_epochs):
     epoch_accuracy = 100 * (number_of_correct_predictions / number_of_images_seen)
     print(f"Val accuracy in this epoch was {epoch_accuracy:.4f}")
     print("==================")
+
+# Inference
+back_to_pil_transform = transforms.Compose([transforms.Normalize((0.), (1/std)),
+                                            transforms.Normalize((-1 * mean), (1.)),
+                                            transforms.ToPILImage()])
+inference_loader = DataLoader(dataset = val_dataset, batch_size = 1, shuffle = True)
+i = 0
+for images, labels in inference_loader:
+    images, labels = images.to(device = device), labels.to(device = device)
+    outputs = model(images)
+
+    _, predicted_class = torch.max(outputs.data, 1)
+    predicted_class = torch.where(predicted_class == 1, torch.tensor(label_1), torch.tensor(label_0))
+
+    pil_image = back_to_pil_transform(images.squeeze(0))
+    
+    # Resize the image for better visibility
+    pil_image = pil_image.resize((280, 280), Image.NEAREST)
+    
+    # Create a new image with a white background
+    background = Image.new('RGB', (300, 320), (255, 255, 255))
+    background.paste(pil_image, (10, 10))
+    
+    # Add text to the image
+    draw = ImageDraw.Draw(background)
+    font = ImageFont.load_default()
+    draw.text((10, 300), f"Predicted: {predicted_class.item()}", fill=(0, 0, 0), font=font)
+    
+    # Display the image
+    background.show()
+    
+    i += 1
+    if i == 5:
+        break
+    
