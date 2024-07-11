@@ -7,6 +7,8 @@ from calculate_mean_and_std import calculate_mean_and_std
 import os
 from PIL import Image, ImageDraw, ImageFont
 
+#
+
 def mnist_multiclass_loss(predictions: torch.Tensor, labels: torch.Tensor):
     predictions_softmax = predictions.softmax(1)
     correct_answer_score = predictions_softmax[torch.arange(predictions.size(0)), labels]
